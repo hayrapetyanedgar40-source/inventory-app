@@ -60,8 +60,8 @@ function render(){
   $('v').innerHTML=`<input id="ln" placeholder="Նոր վայր (օր.՝ Գրասենյակ 1 / Շենք Ա / Սենյակ 204)"><button class="b" onclick="addLoc()">Ավելացնել վայր</button><div style="height:12px"></div>`+
   (S.locs.map(l=>`<div class="c r"><div><b>${esc(l.name)}</b><div class="mu">${S.items.filter(i=>i.loc===l.id).length} միավոր · ${fmt(S.items.filter(i=>i.loc===l.id).reduce((a,i)=>a+dep(i).book,0))}</div></div><button class="b g" onclick="delLoc('${l.id}')">🗑</button></div>`).join('')||'<div class="mu">Վայրեր դեռ չկան</div>');
  }else{
-  $('v').innerHTML=`<div class="c"><b>Արտահանում</b><div class="mu" style="margin:4px 0 10px">CSV բացվում է Excel-ում, JSON՝ լրիվ պահուստ</div><button class="b" onclick="csv()">CSV</button> <button class="b g" onclick="jsn()">JSON պահուստ</button></div>
-  <div class="c"><b>Ներմուծում (JSON)</b><input type="file" accept=".json" onchange="imp(this.files[0])"></div>
+  $('v').innerHTML=`<div class="c"><b>Արտահանում</b><div class="mu" style="margin:4px 0 10px">CSV բացվում է Excel-ում, JSON՝ լրիվ պահուստ</div><button class="b" onclick="xla()">Excel</button> <button class="b g" onclick="csv()">CSV</button> <button class="b g" onclick="jsn()">JSON պահուստ</button></div>
+  <div class="c"><b>Ներմուծում Excel-ից (.xlsx)</b><div class="mu" style="margin:4px 0 8px">Առաջին թերթը, առաջին տողը՝ սյունակների վերնագրեր (Կոդ, Անվանում, Քանակ, Վայր…)։ Նույն կոդով միավորը կթարմացվի, նորը՝ կավելանա։</div><input type="file" accept=".xlsx,.xls" onchange="impx(this.files[0]);this.value=''"></div><div class="c"><b>Ներմուծում (JSON պահուստ)</b><input type="file" accept=".json" onchange="imp(this.files[0])"></div>
   <div class="c"><div class="mu">Տվյալները պահվում են այս սարքի դիտարկիչում։ Պարբերաբար արտահանիր պահուստ։</div></div>`;
  }
 }
@@ -91,7 +91,7 @@ function saveItem(i){
 function delItem(i){if(!confirm('Ջնջե՞լ'))return;S.items=S.items.filter(a=>a.id!==i);save();close_();render()}
 // scanning
 async function scan(fill){
- open_(`<b>Սկանավորում</b><div style="height:8px"></div><video id="vd" playsinline muted></video><div class="mu" id="sm" style="margin:8px 0">Ուղղիր տեսախցիկը կոդի վրա…</div><input id="mn" placeholder="Կամ մուտքագրիր կոդը ձեռքով"><div class="r"><button class="b" onclick="found($('mn').value.trim(),${!!fill})">Ընդունել</button><button class="b g" onclick="close_()">Փակել</button></div>`);
+ open_(`<b>Սկանավորում</b><div style="height:8px"></div><video id="vd" playsinline muted></video><div class="mu" id="sm" style="margin:8px 0">Ուղղիր տեսախցիկը կոդի վրա…</div><input id="mn" placeholder="Կամ մուտքագրիր կոդը ձեռքով"><div class="r"><button class="b g" onclick="nfc(${!!fill})">📡 NFC</button><button class="b" onclick="found($('mn').value.trim(),${!!fill})">Ընդունել</button><button class="b g" onclick="close_()">Փակել</button></div>`);
  if(!('BarcodeDetector' in window)||!navigator.mediaDevices){$('sm').textContent='Այս դիտարկիչը սկան չի աջակցում՝ մուտքագրիր կոդը ձեռքով։';$('vd').style.display='none';return}
  try{
   const det=new BarcodeDetector();
@@ -100,7 +100,7 @@ async function scan(fill){
   const loop=async()=>{if(!stream)return;try{const r=await det.detect(v);if(r.length){found(r[0].rawValue,fill);return}}catch(e){}raf=setTimeout(loop,250)};loop();
  }catch(e){$('sm').textContent='Տեսախցիկը հասանելի չէ՝ մուտքագրիր կոդը ձեռքով։';$('vd').style.display='none'}
 }
-function stop(){clearTimeout(raf);if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+function stop(){clearTimeout(raf);if(window.nc){try{window.nc.abort()}catch(e){}window.nc=null}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
 function found(c,fill){
  if(!c)return;stop();
  if(fill){edit('',c);return}
@@ -119,6 +119,33 @@ async function xl(){if(!S.written.length){alert('Դուրս գրված գույ�
  const rows=S.written.map(i=>[i.inv,i.code,i.name,i.cat,i.qty,i.locN,i.acct,i.date,i.basis,i.cost,i.life,i.resid,i.resp,Math.round(i.woCost||0),Math.round(i.woAcc||0),Math.round(i.woBook||0),i.woDate,i.woBasis,i.woReason].map(v=>v??''));
  const ws=XLSX.utils.aoa_to_sheet([h,...rows]);ws['!cols']=h.map(()=>({wch:20}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Դուրս գրված');
  const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});await dl('written-off-inventory.xlsx',new Blob([buf]))}
+const XH=['Կոդ','Անվանում','Կատեգորիա','Քանակ','Վայր','Վիճակ','Նշում','Գույքագրման համար','Հաշիվ','Միավորի արժեք','Գնման ամսաթիվ','Ծառայության ժամկետ (տարի)','Լուծարային արժեք','Պատասխանատու','Գնման հիմք','Սկզբնական արժեք (ընդհանուր)','Կուտակված մաշվածք','Հաշվեկշռային արժեք'];
+async function xla(){if(!window.XLSX){alert('Excel գրադարանը չբեռնվեց');return}
+ const rows=S.items.map(i=>{const d=dep(i);return [i.code,i.name,i.cat,i.qty,locName(i.loc),i.status,i.note,i.inv,i.acct,i.cost,i.date,i.life,i.resid,i.resp,i.basis,Math.round(d.cost),Math.round(d.acc),Math.round(d.book)].map(v=>v??'')});
+ const ws=XLSX.utils.aoa_to_sheet([XH,...rows]);ws['!cols']=XH.map(()=>({wch:20}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Գույք');
+ await dl('inventory.xlsx',new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})]))}
+const IK={code:['կոդ','շտրիխկոդ','barcode','code','sku'],name:['անվանում','անուն','name','item'],cat:['կատեգորիա','category'],qty:['քանակ','qty','quantity'],loc:['վայր','տեղ','գրասենյակ','location'],status:['վիճակ','status'],note:['նշում','note'],inv:['գույքագրման համար','գույքագրման №','inv'],acct:['հաշիվ','account'],cost:['միավորի արժեք','cost','price','արժեք'],date:['գնման ամսաթիվ','ձեռքբերման ամսաթիվ','ամսաթիվ','date'],life:['ծառայության ժամկետ','life'],resid:['լուծարային','residual'],resp:['պատասխանատու','responsible'],basis:['գնման հիմք','հիմք','basis']};
+function impx(f){if(!f)return;if(!window.XLSX){alert('Excel գրադարանը չբեռնվեց');return}
+ const r=new FileReader();r.onload=()=>{try{
+  const wb=XLSX.read(r.result,{type:'array',cellDates:true});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+  const nm=s=>String(s).toLowerCase().trim();
+  const get=(row,f)=>{for(const x of IK[f])for(const k in row)if(nm(k)===x||nm(k).startsWith(x))return row[k];return ''};
+  let add=0,upd=0;
+  rows.forEach(row=>{
+   const g={};for(const f in IK)g[f]=get(row,f);
+   if(!String(g.name).trim()&&!String(g.code).trim())return;
+   if(g.date instanceof Date)g.date=new Date(g.date.getTime()-g.date.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+   let lid='';const ln=String(g.loc).trim();if(ln){let l=S.locs.find(a=>a.name===ln);if(!l){l={id:id(),name:ln};S.locs.push(l)}lid=l.id}
+   const code=String(g.code).trim();let x=code&&S.items.find(a=>a.code===code);
+   const o={code,name:String(g.name).trim()||code,cat:String(g.cat).trim(),qty:g.qty===''?1:(+g.qty||0),loc:lid,status:String(g.status).trim()||ST[0],note:String(g.note).trim(),inv:String(g.inv).trim(),acct:String(g.acct).trim(),cost:+g.cost||0,date:String(g.date).slice(0,10),life:+g.life||0,resid:+g.resid||0,resp:String(g.resp).trim(),basis:String(g.basis).trim()};
+   if(x){for(const k in o){if(o[k]!==''&&o[k]!==0||k==='qty')x[k]=o[k]}upd++}else{S.items.push({id:id(),...o});add++}
+  });
+  save();alert('Ավելացվեց՝ '+add+', թարմացվեց՝ '+upd);tab(0);
+ }catch(e){alert('Ֆայլը չհաջողվեց կարդալ')}};r.readAsArrayBuffer(f)}
+async function nfc(fill){const sm=$('sm');if(!('NDEFReader' in window)){sm.textContent='NFC-ն այս սարքում կամ դիտարկիչում աշխատում չէ (անհրաժեշտ է Android + Chrome)։';return}
+ try{window.nc=new AbortController();const r=new NDEFReader();await r.scan({signal:window.nc.signal});sm.textContent='Մոտեցրու NFC պիթակը հեռախոսի հետևին…';
+  r.onreading=e=>{found((e.serialNumber||'').replace(/:/g,'').toUpperCase(),fill)};r.onreadingerror=()=>{sm.textContent='Պիթակը չկարդացվեց, փորձիր նորից'}
+ }catch(e){sm.textContent='NFC-ն անջատված է կամ թույլտվություն չկա։ Միացրու NFC-ն հեռախոսի կարգավորումներում'}}
 // export/import
 async function dl(n,t,m){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:t});return}}catch(e){if(e&&e.code==='declined')return}
  const a=document.createElement('a');a.href=URL.createObjectURL(t instanceof Blob?t:new Blob([t],{type:m}));a.download=n;a.click()}
