@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Գույքագրում</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2563eb">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#6b7280;--ac:#2563eb;--bd:#e3e6ea;--ok:#16a34a;--bad:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111418;--card:#1b2027;--tx:#e8eaed;--mu:#9aa3ad;--ac:#5b8cff;--bd:#2c333c}}
+:root[data-theme="dark"]{--bg:#111418;--card:#1b2027;--tx:#e8eaed;--mu:#9aa3ad;--ac:#5b8cff;--bd:#2c333c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px system-ui,sans-serif;padding-bottom:90px}
+header{padding:14px 16px 6px;font-size:20px;font-weight:700}
+nav{display:flex;gap:6px;padding:6px 12px}nav button{flex:1;padding:9px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font:inherit}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.w{padding:8px 12px}input,select,textarea{width:100%;padding:10px;margin:4px 0 10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);font:inherit}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:8px}
+.r{display:flex;justify-content:space-between;gap:8px;align-items:center}.mu{color:var(--mu);font-size:13px}
+.b{padding:10px 14px;border:0;border-radius:10px;background:var(--ac);color:#fff;font:inherit}.b.g{background:var(--card);color:var(--tx);border:1px solid var(--bd)}.b.d{background:var(--bad)}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:8px}.fab .b{box-shadow:0 4px 12px #0004;padding:14px 18px;border-radius:30px}
+.tag{font-size:12px;padding:2px 8px;border-radius:8px;border:1px solid var(--bd)}
+#m{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;z-index:5}
+#m>div{background:var(--bg);width:100%;max-height:92%;overflow:auto;padding:14px;border-radius:18px 18px 0 0;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+video{width:100%;border-radius:12px;background:#000}
+</style>
+</head>
+<body>
+<header>📦 Գույքագրում</header>
+<nav><button id="t0" onclick="tab(0)">Գույք</button><button id="t1" onclick="tab(1)">Վայրեր</button><button id="t3" onclick="tab(3)">Դուրս գրված</button><button id="t2" onclick="tab(2)">Տվյալներ</button></nav>
+<div class="w" id="v"></div>
+<div class="fab"><button class="b g" onclick="scan()">📷 Սկան</button><button class="b" onclick="edit()">＋ Նոր</button></div>
+<div id="m"><div id="mc"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+let S={locs:[],items:[]},T=0,Q='',F='',stream=null,raf=0;
+try{const x=localStorage.getItem('inv1');if(x)S=JSON.parse(x)}catch(e){}
+S.written=S.written||[];
+const save=()=>{try{localStorage.setItem('inv1',JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const id=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const locName=i=>(S.locs.find(l=>l.id===i)||{}).name||'—';
+const fmt=n=>Math.round(n).toLocaleString('en-US')+' ֏';
+function dep(x,at){const c=+x.cost||0,r=+x.resid||0,y=+x.life||0,q=+x.qty||0;let a=0;if(c&&y&&x.date){const d=new Date(x.date),n=at?new Date(at):new Date();let m=(n.getFullYear()-d.getFullYear())*12+n.getMonth()-d.getMonth();if(m<0)m=0;a=Math.min(Math.max(c-r,0),(c-r)/(y*12)*m)}return{cost:c*q,acc:a*q,book:(c-a)*q,mon:y?(c-r)/(y*12)*q:0}}
+function sum(L){let a=0,b=0,c=0;L.forEach(i=>{const d=dep(i);a+=d.cost;b+=d.acc;c+=d.book});return `<div class="c"><div class="r"><span class="mu">Սկզբնական արժեք</span><b>${fmt(a)}</b></div><div class="r"><span class="mu">Կուտակված մաշվածք</span><b>${fmt(b)}</b></div><div class="r"><span class="mu">Հաշվեկշռային (մնացորդային) արժեք</span><b>${fmt(c)}</b></div></div>`}
+const ST=['Աշխատում է','Վերանորոգման','Վնասված','Դուրս գրված'];
+function tab(n){T=n;[0,1,2,3].forEach(i=>$('t'+i).classList.toggle('on',i===n));render()}
+function render(){
+ if(T===3){wr();return}
+ if(T===0){
+  const q=Q.toLowerCase();
+  const L=S.items.filter(i=>(!F||i.loc===F)&&(!q||(i.name+i.code+i.cat+i.note).toLowerCase().includes(q)));
+  $('v').innerHTML=`<input placeholder="Որոնում՝ անուն, կոդ, կատեգորիա…" value="${esc(Q)}" oninput="Q=this.value;render2()" id="q">
+  <select onchange="F=this.value;render()"><option value="">Բոլոր վայրերը</option>${S.locs.map(l=>`<option value="${l.id}" ${F===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select>
+  <div class="mu" style="margin-bottom:8px">${L.length} / ${S.items.length} միավոր</div><div id="lst">${list(L)}</div>`;
+ }else if(T===1){
+  $('v').innerHTML=`<input id="ln" placeholder="Նոր վայր (օր.՝ Գրասենյակ 1 / Շենք Ա / Սենյակ 204)"><button class="b" onclick="addLoc()">Ավելացնել վայր</button><div style="height:12px"></div>`+
+  (S.locs.map(l=>`<div class="c r"><div><b>${esc(l.name)}</b><div class="mu">${S.items.filter(i=>i.loc===l.id).length} միավոր · ${fmt(S.items.filter(i=>i.loc===l.id).reduce((a,i)=>a+dep(i).book,0))}</div></div><button class="b g" onclick="delLoc('${l.id}')">🗑</button></div>`).join('')||'<div class="mu">Վայրեր դեռ չկան</div>');
+ }else{
+  $('v').innerHTML=`<div class="c"><b>Արտահանում</b><div class="mu" style="margin:4px 0 10px">CSV բացվում է Excel-ում, JSON՝ լրիվ պահուստ</div><button class="b" onclick="csv()">CSV</button> <button class="b g" onclick="jsn()">JSON պահուստ</button></div>
+  <div class="c"><b>Ներմուծում (JSON)</b><input type="file" accept=".json" onchange="imp(this.files[0])"></div>
+  <div class="c"><div class="mu">Տվյալները պահվում են այս սարքի դիտարկիչում։ Պարբերաբար արտահանիր պահուստ։</div></div>`;
+ }
+}
+function render2(){const q=Q.toLowerCase();$('lst').innerHTML=list(S.items.filter(i=>(!F||i.loc===F)&&(!q||(i.name+i.code+i.cat+i.note).toLowerCase().includes(q))))}
+function list(L){return sum(L)+L.map(i=>`<div class="c" onclick="edit('${i.id}')"><div class="r"><b>${esc(i.name)}</b><span class="tag">× ${i.qty}</span></div><div class="mu">${esc(i.code)} · ${esc(i.cat)} · ${esc(locName(i.loc))}</div><span class="tag">${esc(i.status)}</span>${i.cost?` <span class="tag">Հաշվեկշռային՝ ${fmt(dep(i).book)}</span>`:''}${i.inv?` <span class="tag">#${esc(i.inv)}</span>`:''}${i.resp?` <span class="tag">👤 ${esc(i.resp)}</span>`:''}${i.date?` <span class="tag">${esc(String(i.date).slice(0,4))} թ.</span>`:''}${i.basis?` <span class="tag">${esc(i.basis)}</span>`:''}<div style="margin-top:8px"><button class="b g" onclick="event.stopPropagation();wo('${i.id}')">Դուրս գրել</button></div></div>`).join('')||'<div class="mu">Դատարկ է։ Սեղմիր «Նոր» կամ «Սկան»։</div>'}
+function addLoc(){const n=$('ln').value.trim();if(!n)return;S.locs.push({id:id(),name:n});save();render()}
+function delLoc(i){if(S.items.some(x=>x.loc===i)&&!confirm('Այս վայրում գույք կա։ Ջնջե՞լ վայրը։'))return;S.locs=S.locs.filter(l=>l.id!==i);S.items.forEach(x=>{if(x.loc===i)x.loc=''});save();render()}
+function open_(h){$('mc').innerHTML=h;$('m').style.display='flex'}
+function close_(){stop();$('m').style.display='none'}
+function edit(i,code){
+ const x=S.items.find(a=>a.id===i)||{id:'',code:code||'',name:'',cat:'',qty:1,loc:F,status:ST[0],note:'',inv:'',acct:'',cost:'',date:'',life:'',resid:'',resp:'',basis:''};
+ open_(`<b>${x.id?'Խմբագրել':'Նոր միավոր'}</b><div style="height:8px"></div>
+ <label class="mu">Անվանում</label><input id="f_n" value="${esc(x.name)}">
+ <label class="mu">Կոդ / շտրիխկոդ</label><div class="r"><input id="f_c" value="${esc(x.code)}"><button class="b g" style="margin-bottom:6px" onclick="scan(true)">📷</button></div>
+ <label class="mu">Կատեգորիա</label><input id="f_g" value="${esc(x.cat)}" placeholder="Գրասենյակային, տեխնիկա, կահույք…">
+ <label class="mu">Քանակ</label><input id="f_q" type="number" min="0" value="${x.qty}">
+ <label class="mu">Վայր</label><select id="f_l"><option value="">—</option>${S.locs.map(l=>`<option value="${l.id}" ${x.loc===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select>
+ <label class="mu">Վիճակ</label><select id="f_s">${ST.map(s=>`<option ${x.status===s?'selected':''}>${s}</option>`).join('')}</select>
+ <div class="c"><b>Հաշվապահական հաշվառում</b><div style="height:8px"></div><label class="mu">Գույքագրման համար</label><input id="f_i" value="${esc(x.inv)}"><label class="mu">Հաշվի համար (օր.՝ 211, 221)</label><input id="f_a" value="${esc(x.acct)}"><label class="mu">Միավորի սկզբնական արժեք (֏)</label><input id="f_p" type="number" min="0" value="${x.cost}"><label class="mu">Գնման տարեթիվ (ամսաթիվ)</label><input id="f_d" type="date" value="${esc(x.date)}"><label class="mu">Գնման հիմք (պայմանագիր, հաշիվ-ապրանքագիր №, ակտ)</label><input id="f_b" value="${esc(x.basis)}"><label class="mu">Օգտակար ծառայության ժամկետ (տարի)</label><input id="f_y" type="number" min="0" step="0.5" value="${x.life}"><label class="mu">Լուծարային արժեք (֏)</label><input id="f_r" type="number" min="0" value="${x.resid}"><label class="mu">Նյութական պատասխանատու անձ</label><input id="f_o" value="${esc(x.resp)}">${x.cost?`<div class="mu">Ամսական մաշվածք՝ ${fmt(dep(x).mon)} · Կուտակված՝ ${fmt(dep(x).acc)} · Հաշվեկշռային՝ ${fmt(dep(x).book)}</div>`:''}</div><label class="mu">Նշում</label><textarea id="f_t" rows="2">${esc(x.note)}</textarea>
+ <div class="r"><button class="b" onclick="saveItem('${x.id}')">Պահել</button><button class="b g" onclick="close_()">Փակել</button>${x.id?`<button class="b g" onclick="wo('${x.id}')">Դուրս գրել</button><button class="b d" onclick="delItem('${x.id}')">Ջնջել</button>`:''}</div>`);
+}
+function saveItem(i){
+ const o={name:$('f_n').value.trim(),code:$('f_c').value.trim(),cat:$('f_g').value.trim(),qty:+$('f_q').value||0,loc:$('f_l').value,status:$('f_s').value,note:$('f_t').value.trim(),inv:$('f_i').value.trim(),acct:$('f_a').value.trim(),cost:+$('f_p').value||0,date:$('f_d').value,life:+$('f_y').value||0,resid:+$('f_r').value||0,resp:$('f_o').value.trim(),basis:$('f_b').value.trim()};
+ if(!o.name){alert('Գրիր անվանումը');return}
+ if(i){Object.assign(S.items.find(a=>a.id===i),o)}else S.items.unshift({id:id(),...o});
+ save();close_();render()}
+function delItem(i){if(!confirm('Ջնջե՞լ'))return;S.items=S.items.filter(a=>a.id!==i);save();close_();render()}
+// scanning
+async function scan(fill){
+ open_(`<b>Սկանավորում</b><div style="height:8px"></div><video id="vd" playsinline muted></video><div class="mu" id="sm" style="margin:8px 0">Ուղղիր տեսախցիկը կոդի վրա…</div><input id="mn" placeholder="Կամ մուտքագրիր կոդը ձեռքով"><div class="r"><button class="b" onclick="found($('mn').value.trim(),${!!fill})">Ընդունել</button><button class="b g" onclick="close_()">Փակել</button></div>`);
+ if(!('BarcodeDetector' in window)||!navigator.mediaDevices){$('sm').textContent='Այս դիտարկիչը սկան չի աջակցում՝ մուտքագրիր կոդը ձեռքով։';$('vd').style.display='none';return}
+ try{
+  const det=new BarcodeDetector();
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+  const v=$('vd');v.srcObject=stream;await v.play();
+  const loop=async()=>{if(!stream)return;try{const r=await det.detect(v);if(r.length){found(r[0].rawValue,fill);return}}catch(e){}raf=setTimeout(loop,250)};loop();
+ }catch(e){$('sm').textContent='Տեսախցիկը հասանելի չէ՝ մուտքագրիր կոդը ձեռքով։';$('vd').style.display='none'}
+}
+function stop(){clearTimeout(raf);if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+function found(c,fill){
+ if(!c)return;stop();
+ if(fill){edit('',c);return}
+ const x=S.items.find(a=>a.code===c);
+ if(x)edit(x.id);else edit('',c);
+}
+// write-off
+function wo(i){const x=S.items.find(a=>a.id===i);if(!x)return;const d=new Date().toISOString().slice(0,10);
+ open_(`<b>Դուրս գրում՝ ${esc(x.name)}</b><div style="height:8px"></div><label class="mu">Դուրս գրման ամսաթիվ</label><input id="w_d" type="date" value="${d}"><label class="mu">Դուրս գրման հիմք (ակտի №, հրաման)</label><input id="w_b"><label class="mu">Պատճառ</label><select id="w_r">${['Մաշվածություն','Վնասվածք','Կորուստ','Վաճառք','Այլ'].map(s=>`<option>${s}</option>`).join('')}</select><div class="mu">Գույքը կտեղափոխվի «Դուրս գրված» ցանկ և ակտիվ ցանկից կհեռանա։</div><div style="height:8px"></div><div class="r"><button class="b d" onclick="woOk('${i}')">Դուրս գրել</button><button class="b g" onclick="close_()">Չեղարկել</button></div>`)}
+function woOk(i){const x=S.items.find(a=>a.id===i);if(!x)return;const d=$('w_d').value;const e=dep(x,d||undefined);S.written.unshift({...x,locN:locName(x.loc),woDate:d,woBasis:$('w_b').value.trim(),woReason:$('w_r').value,woAcc:e.acc,woBook:e.book,woCost:e.cost});S.items=S.items.filter(a=>a.id!==i);save();close_();render()}
+function rest(i){const x=S.written.find(a=>a.id===i);if(!x)return;if(!confirm('Վերադարձնե՞լ ակտիվ ցանկ'))return;const{locN,woDate,woBasis,woReason,woAcc,woBook,woCost,...y}=x;S.items.unshift(y);S.written=S.written.filter(a=>a.id!==i);save();render()}
+function wr(){const L=S.written;let c=0,a=0,b=0;L.forEach(i=>{c+=i.woCost||0;a+=i.woAcc||0;b+=i.woBook||0});
+ $('v').innerHTML=`<div class="c"><div class="r"><span class="mu">Դուրս գրված միավորներ</span><b>${L.length}</b></div><div class="r"><span class="mu">Սկզբնական արժեք</span><b>${fmt(c)}</b></div><div class="r"><span class="mu">Կուտակված մաշվածք</span><b>${fmt(a)}</b></div><div class="r"><span class="mu">Հաշվեկշռային արժեք դուրս գրման պահին</span><b>${fmt(b)}</b></div></div><button class="b" onclick="xl()">📥 Excel ֆայլ (դուրս գրված)</button><div style="height:10px"></div>`+(L.map(i=>`<div class="c"><div class="r"><b>${esc(i.name)}</b><span class="tag">× ${i.qty}</span></div><div class="mu">${esc(i.code)} · ${esc(i.locN)}</div><div class="mu">${esc(i.woDate)} · ${esc(i.woReason)}${i.woBasis?' · '+esc(i.woBasis):''}</div><div style="margin-top:8px"><button class="b g" onclick="rest('${i.id}')">Վերականգնել</button></div></div>`).join('')||'<div class="mu">Դուրս գրված գույք դեռ չկա։</div>')}
+async function xl(){if(!S.written.length){alert('Դուրս գրված գույք չկա');return}if(!window.XLSX){alert('Excel գրադարանը չբեռնվեց');return}
+ const h=['Գույքագրման №','Կոդ','Անվանում','Կատեգորիա','Քանակ','Վայր','Հաշիվ','Գնման ամսաթիվ','Գնման հիմք','Միավորի արժեք','Ծառայության ժամկետ (տարի)','Լուծարային արժեք','Պատասխանատու','Սկզբնական արժեք (ընդհանուր)','Կուտակված մաշվածք','Հաշվեկշռային արժեք','Դուրս գրման ամսաթիվ','Դուրս գրման հիմք','Պատճառ'];
+ const rows=S.written.map(i=>[i.inv,i.code,i.name,i.cat,i.qty,i.locN,i.acct,i.date,i.basis,i.cost,i.life,i.resid,i.resp,Math.round(i.woCost||0),Math.round(i.woAcc||0),Math.round(i.woBook||0),i.woDate,i.woBasis,i.woReason].map(v=>v??''));
+ const ws=XLSX.utils.aoa_to_sheet([h,...rows]);ws['!cols']=h.map(()=>({wch:20}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Դուրս գրված');
+ const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});await dl('written-off-inventory.xlsx',new Blob([buf]))}
+// export/import
+async function dl(n,t,m){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:t});return}}catch(e){if(e&&e.code==='declined')return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(t instanceof Blob?t:new Blob([t],{type:m}));a.download=n;a.click()}
+function csv(){const h=['Կոդ','Անվանում','Կատեգորիա','Քանակ','Վայր','Վիճակ','Նշում','Գույքագրման համար','Հաշիվ','Միավորի արժեք','Ձեռքբերման ամսաթիվ','Ծառայության ժամկետ (տարի)','Լուծարային արժեք','Պատասխանատու','Սկզբնական արժեք (ընդհանուր)','Կուտակված մաշվածք','Հաշվեկշռային արժեք','Գնման հիմք'];const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ dl('inventory.csv','\ufeff'+[h.map(q).join(',')].concat(S.items.map(i=>[i.code,i.name,i.cat,i.qty,locName(i.loc),i.status,i.note,i.inv,i.acct,i.cost,i.date,i.life,i.resid,i.resp,Math.round(dep(i).cost),Math.round(dep(i).acc),Math.round(dep(i).book),i.basis].map(q).join(','))).join('\n'),'text/csv')}
+function jsn(){dl('inventory-backup.json',JSON.stringify(S),'application/json')}
+function imp(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.items&&d.locs){S=d;save();alert('Ներմուծվեց');tab(0)}}catch(e){alert('Սխալ ֆայլ')}};r.readAsText(f)}
+tab(0);
+if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+</body>
+</html>
