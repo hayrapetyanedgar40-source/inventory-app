@@ -33,7 +33,8 @@ video{width:100%;border-radius:12px;background:#000}
 <nav><button id="t0" onclick="tab(0)">Գույք</button><button id="t1" onclick="tab(1)">Վայրեր</button><button id="t3" onclick="tab(3)">Դուրս գրված</button><button id="t2" onclick="tab(2)">Տվյալներ</button></nav>
 <div class="w" id="v"></div>
 <div class="fab"><button class="b g" onclick="scan()">📷 Սկան</button><button class="b" onclick="edit()">＋ Նոր</button></div>
-<div id="lg" style="position:fixed;inset:0;z-index:9;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px"><div class="c" style="width:100%;max-width:360px"><b style="font-size:18px">Մուտք</b><div style="height:10px"></div><input id="lg_e" type="email" placeholder="Email" autocomplete="username"><input id="lg_p" type="password" placeholder="Գաղտնաբառ" autocomplete="current-password"><div id="lg_m" class="mu" style="color:var(--bad);min-height:18px;margin-bottom:6px"></div><button class="b" style="width:100%" onclick="doLogin()">Մուտք գործել</button></div></div>
+<div id="lg" style="position:fixed;inset:0;z-index:9;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px"><div class="c" style="width:100%;max-width:360px"><b style="font-size:18px">Մուտք</b><div style="height:10px"></div><input id="lg_e" type="email" placeholder="Email" autocomplete="username"><input id="lg_p" type="password" placeholder="Գաղտնաբառ" autocomplete="current-password"><div id="lg_m" class="mu" style="color:var(--bad);min-height:18px;margin-bottom:6px"></div><button class="b" style="width:100%" onclick="doLogin()">Մուտք գործել</button><div style="text-align:center;margin-top:10px"><a href="#" onclick="doReset();return false" class="mu">Մոռացել եմ գաղտնաբառը</a></div></div></div>
+<div id="nm" style="position:fixed;inset:0;z-index:8;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px"><div class="c" style="width:100%;max-width:360px"><b>Կազմակերպություն չկա</b><div class="mu" style="margin:8px 0 12px">Այս հաշվին դեռ կազմակերպություն չի կցվել։ Դիմիր ադմինիստրատորին։</div><button class="b g" onclick="doLogout()">Ելք</button></div></div>
 <div id="m"><div id="mc"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
@@ -153,13 +154,15 @@ async function nfc(fill){const sm=$('sm');if(!('NDEFReader' in window)){sm.textC
 const orgTag=()=>{const o=(window.ORGS||[]).find(x=>x.id===window.CUR);return((o?o.name:'org').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,''))||'org'};
 function calcStats(){let u=0,c=0,b=0;S.items.forEach(i=>{const d=dep(i);u+=+i.qty||0;c+=d.cost;b+=d.book});return{items:S.items.length,units:u,cost:Math.round(c),book:Math.round(b),written:S.written.length}}
 function ov(){
- const O=window.ORGS||[];
- if(!window.orgAdd){$('v').innerHTML='<div class="mu">Կազմակերպությունների կառավարումը հասանելի է միայն ամպային տարբերակում։</div>';return}
+ const O=window.ORGS||[],A=!!window.ISADMIN;
+ if(!window.orgOpen){$('v').innerHTML='<div class="mu">Կազմակերպությունների կառավարումը հասանելի է միայն ամպային տարբերակում։</div>';return}
+ if(!A&&O.length<=1){tab(0);return}
  let tI=0,tU=0,tB=0,tW=0;const st={};
  O.forEach(o=>{const s=o.id===window.CUR?calcStats():(o.stats||null);st[o.id]=s;if(s){tI+=s.items||0;tU+=s.units||0;tB+=s.book||0;tW+=s.written||0}});
- $('v').innerHTML=`<div class="c"><b>Կառավարման կենտրոն</b><div style="height:6px"></div><div class="r"><span class="mu">Կազմակերպություններ</span><b>${O.length}</b></div><div class="r"><span class="mu">Միավորներ (տեսակ / քանակ)</span><b>${tI} / ${tU}</b></div><div class="r"><span class="mu">Հաշվեկշռային արժեք (ընդհանուր)</span><b>${fmt(tB)}</b></div><div class="r"><span class="mu">Դուրս գրված</span><b>${tW}</b></div></div>
- <div class="c"><input id="on" placeholder="Նոր կազմակերպության անվանում"><button class="b" onclick="orgAdd()">＋ Ավելացնել կազմակերպություն</button></div>
- <div class="og">${O.map(o=>{const s=st[o.id];return `<div class="c"><div class="r"><b>${esc(o.name)}</b>${o.id===window.CUR?'<span class="tag">ակտիվ</span>':''}</div>${s?`<div class="mu">${s.items} տեսակ · ${s.units} միավոր</div><div class="mu">Հաշվեկշռային՝ ${fmt(s.book)} · Դուրս գրված՝ ${s.written}</div>`:'<div class="mu">Տվյալները դեռ չեն բացվել</div>'}<div class="r" style="margin-top:8px"><button class="b" onclick="orgOpen('${o.id}')">Բացել</button><span><button class="b g" onclick="orgRename('${o.id}')">✏</button> <button class="b g" onclick="orgDel('${o.id}')">🗑</button></span></div></div>`}).join('')}</div>`;
+ const head=A?`<div class="c"><b>Կառավարման կենտրոն</b><div style="height:6px"></div><div class="r"><span class="mu">Կազմակերպություններ</span><b>${O.length}</b></div><div class="r"><span class="mu">Միավորներ (տեսակ / քանակ)</span><b>${tI} / ${tU}</b></div><div class="r"><span class="mu">Հաշվեկշռային արժեք (ընդհանուր)</span><b>${fmt(tB)}</b></div><div class="r"><span class="mu">Դուրս գրված</span><b>${tW}</b></div></div>
+ <div class="c"><input id="on" placeholder="Նոր կազմակերպության անվանում"><button class="b" onclick="orgAdd()">＋ Ավելացնել կազմակերպություն</button></div>`:'<div class="c"><b>Կազմակերպություններ</b></div>';
+ const mig=(A&&!localStorage.getItem('inv_migrated_'+window.UID))?`<div class="c"><div class="mu" style="margin-bottom:8px">Նախորդ տարբերակի ամպային տվյալները նոր կառուցվածք տեղափոխելու համար (մեկ անգամ)։</div><button class="b g" onclick="migrateLegacy()">Տեղափոխել հին տվյալները</button></div>`:'';
+ $('v').innerHTML=head+`<div class="og">${O.map(o=>{const s=st[o.id];return `<div class="c"><div class="r"><b>${esc(o.name)}</b>${o.id===window.CUR?'<span class="tag">ակտիվ</span>':''}</div>${s?`<div class="mu">${s.items} տեսակ · ${s.units} միավոր</div><div class="mu">Հաշվեկշռային՝ ${fmt(s.book)} · Դուրս գրված՝ ${s.written}</div>`:'<div class="mu">Տվյալները դեռ չեն բացվել</div>'}${A?`<div class="mu">👥 ${(o.members||[]).length} հաճախորդ</div>`:''}<div class="r" style="margin-top:8px"><button class="b" onclick="orgOpen('${o.id}')">Բացել</button>${A?`<span><button class="b g" onclick="orgAccess('${o.id}')">👥</button> <button class="b g" onclick="orgRename('${o.id}')">✏</button> <button class="b g" onclick="orgDel('${o.id}')">🗑</button></span>`:''}</div></div>`}).join('')}</div>`+mig;
 }
 // export/import
 async function dl(n,t,m){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:t});return}}catch(e){if(e&&e.code==='declined')return}
@@ -173,25 +176,27 @@ if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWor
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import {getAuth,setPersistence,browserLocalPersistence,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,writeBatch,setDoc,deleteDoc,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-const app=initializeApp({apiKey:"AIzaSyChch1QNDSJiA4nqKUZlX-WqC1zqO0EeGo",authDomain:"inventory-app-7495a.firebaseapp.com",projectId:"inventory-app-7495a",storageBucket:"inventory-app-7495a.firebasestorage.app",messagingSenderId:"551746067046",appId:"1:551746067046:web:6ee9c0e20dac6d6d3aeba7"});
+import {getAuth,initializeAuth,inMemoryPersistence,setPersistence,browserLocalPersistence,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,writeBatch,setDoc,updateDoc,deleteDoc,getDocs,query,where,limit,arrayUnion,arrayRemove} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const cfg={apiKey:"AIzaSyChch1QNDSJiA4nqKUZlX-WqC1zqO0EeGo",authDomain:"inventory-app-7495a.firebaseapp.com",projectId:"inventory-app-7495a",storageBucket:"inventory-app-7495a.firebasestorage.app",messagingSenderId:"551746067046",appId:"1:551746067046:web:6ee9c0e20dac6d6d3aeba7"};
+const app=initializeApp(cfg);
 const auth=getAuth(app);
 try{await setPersistence(auth,browserLocalPersistence)}catch(e){}
 const db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
 const CO=['locs','items','written'];
 const E0=()=>({locs:{},items:{},written:{}});
-let uid=null,unsubs=[],orgUn=null,cur=null,last=E0(),ready=false,first={},gen=0;
+let uid=null,email='',unsubs=[],orgUn=null,cur=null,dataFor=null,last=E0(),ready=false,first={},gen=0,secAuth=null;
 const el=id=>document.getElementById(id);
 const sy=t=>{const e=el('sy');if(e)e.textContent=t};
-const base=(o=cur)=>o==='main'?['users',uid]:['users',uid,'orgs',o];
+const base=(o=cur)=>['orgs',o];
 const lk=o=>o==='main'?'inv1':'inv_data_'+o;
-function hdr(){const o=(window.ORGS||[]).find(x=>x.id===cur);const e=el('on_h');if(e)e.textContent='📦 '+(o?o.name:'Գույքագրում')+' ▾'}
+function hdr(){const o=(window.ORGS||[]).find(x=>x.id===cur);const e=el('on_h');if(e)e.textContent='📦 '+(o?o.name:'Գույքագրում')+((window.ISADMIN||(window.ORGS||[]).length>1)?' ▾':'')}
 function setCur(o){cur=o;window.CUR=o;window.LK=lk(o);try{localStorage.setItem('inv_org_'+uid,o)}catch(e){}hdr()}
 function loadLocal(){let p={};try{p=JSON.parse(localStorage.getItem(window.LK)||'{}')}catch(e){}S.locs=p.locs||[];S.items=p.items||[];S.written=p.written||[]}
-function stats(){if(uid&&cur)setDoc(doc(db,'users',uid,'orgs',cur),{stats:calcStats()},{merge:true}).catch(()=>{})}
+function wipeLocal(){S.locs=[];S.items=[];S.written=[];Object.keys(localStorage).filter(k=>k==='inv1'||k.startsWith('inv_data_')).forEach(k=>localStorage.removeItem(k))}
+function stats(){if(uid&&cur)setDoc(doc(db,'orgs',cur),{stats:calcStats()},{merge:true}).catch(()=>{})}
 async function push(force){
- if(!uid||(!ready&&!force))return false;
+ if(!uid||!cur||(!ready&&!force))return false;
  const o=cur,b=base(o),ops=[];
  for(const c of CO){
   const now={};(S[c]||[]).forEach(x=>{now[x.id]=JSON.stringify(x)});
@@ -228,7 +233,7 @@ function listen(){
  });
 }
 async function startData(){
- const o=cur,flag=o==='main'?'inv_synced_'+uid:'inv_sync_'+uid+'_'+o;
+ const o=cur,flag='inv_s2_'+uid+'_'+o;
  if(!localStorage.getItem(flag)){
   sy('⏳');
   const ok=await push(true);
@@ -239,22 +244,47 @@ async function startData(){
  listen();
 }
 function stopData(){gen++;unsubs.forEach(u=>u());unsubs=[];ready=false;first={};last=E0()}
-function switchTo(o){stopData();setCur(o);loadLocal();F='';Q='';render();startData()}
+function switchTo(o){stopData();setCur(o);dataFor=o;loadLocal();F='';Q='';render();startData()}
+async function detectRole(){
+ const key='inv_role_'+uid,cached=localStorage.getItem(key);
+ try{
+  const s=await getDocs(query(collection(db,'orgs'),limit(1)));
+  if(!s.metadata.fromCache){window.ISADMIN=true;localStorage.setItem(key,'a');return}
+  window.ISADMIN=cached==='a';
+ }catch(e){
+  if(e.code==='permission-denied'){window.ISADMIN=false;localStorage.setItem(key,'c')}
+  else window.ISADMIN=cached==='a';
+ }
+}
 function listenOrgs(){
- orgUn=onSnapshot(collection(db,'users',uid,'orgs'),snap=>{
-  const a=[];snap.forEach(d=>{const x=d.data();a.push({id:d.id,...x,name:x.name||(d.id==='main'?'Հիմնական':'Առանց անվան')})});
+ const q=window.ISADMIN?collection(db,'orgs'):query(collection(db,'orgs'),where('members','array-contains',email));
+ orgUn=onSnapshot(q,snap=>{
+  const a=[];snap.forEach(d=>{const x=d.data();a.push({id:d.id,...x,name:x.name||'Առանց անվան',members:x.members||[]})});
   a.sort((x,y)=>(x.ts||0)-(y.ts||0));
   window.ORGS=a;
-  if(snap.empty&&!snap.metadata.fromCache){setDoc(doc(db,'users',uid,'orgs','main'),{name:'Հիմնական',ts:1},{merge:true}).catch(()=>{});return}
-  if(a.length&&!a.find(x=>x.id===cur)){switchTo(a[0].id);return}
-  hdr();if(T===4)render();
- },err=>console.error(err));
+  const srv=!snap.metadata.fromCache;
+  if(!a.length){
+   if(srv){if(window.ISADMIN)setDoc(doc(db,'orgs','main'),{name:'Հիմնական',ts:1,members:[]},{merge:true}).catch(()=>{});else el('nm').style.display='flex'}
+   return;
+  }
+  el('nm').style.display='none';
+  const want=a.find(x=>x.id===cur)?cur:a[0].id;
+  if(dataFor!==want)switchTo(want);else{hdr();if(T===4)render()}
+ },err=>{
+  if(err.code==='permission-denied'&&window.ISADMIN){window.ISADMIN=false;try{localStorage.setItem('inv_role_'+uid,'c')}catch(e){}if(orgUn){orgUn();orgUn=null}listenOrgs();return}
+  console.error(err);sy('⚠ '+(err.code||'error'));
+ });
 }
-function stopAll(){stopData();if(orgUn){orgUn();orgUn=null}uid=null;window.ORGS=[];sy('')}
+function stopAll(){stopData();if(orgUn){orgUn();orgUn=null}uid=null;dataFor=null;window.ORGS=[];window.ISADMIN=false;sy('')}
 async function start(u){
- stopAll();uid=u.uid;
+ stopAll();uid=u.uid;window.UID=uid;email=(u.email||'').toLowerCase();
+ const pu=localStorage.getItem('inv_uid');
+ if(pu&&pu!==uid)wipeLocal();
+ try{localStorage.setItem('inv_uid',uid)}catch(e){}
  setCur(localStorage.getItem('inv_org_'+uid)||'main');loadLocal();render();
- listenOrgs();startData();
+ await detectRole();
+ if(uid!==u.uid)return;
+ listenOrgs();
 }
 onAuthStateChanged(auth,u=>{
  if(u){el('lg').style.display='none';start(u)}
@@ -265,26 +295,34 @@ window.doLogin=async()=>{
  try{await signInWithEmailAndPassword(auth,el('lg_e').value.trim(),el('lg_p').value)}
  catch(e){m.textContent=(e.code==='auth/network-request-failed')?'Ինտերնետ չկա':'Սխալ email կամ գաղտնաբառ'}
 };
+window.doReset=async()=>{
+ const m=el('lg_m'),e=el('lg_e').value.trim();
+ if(!e){m.textContent='Նախ գրիր քո email-ը';return}
+ try{await sendPasswordResetEmail(auth,e);m.textContent='Վերականգնման նամակը ուղարկվեց (ստուգիր նաև սպամը)'}
+ catch(er){m.textContent='Չհաջողվեց ուղարկել'}
+};
 window.doLogout=async()=>{
  if(!confirm('Դուրս գա՞լ։ Տեղային պատճենը այս սարքից կջնջվի, տվյալները կմնան ամպում։'))return;
  await signOut(auth);
- S.locs=[];S.items=[];S.written=[];
- Object.keys(localStorage).filter(k=>k==='inv1'||k.startsWith('inv_data_')).forEach(k=>localStorage.removeItem(k));
- window.LK=undefined;render();
+ wipeLocal();window.LK=undefined;render();
+ el('nm').style.display='none';
 };
 window.orgOpen=id=>{if(id!==cur)switchTo(id);tab(0)};
 window.orgAdd=async()=>{
+ if(!window.ISADMIN)return;
  const n=el('on').value.trim();if(!n)return;
- const r=doc(collection(db,'users',uid,'orgs'));
- await setDoc(r,{name:n,ts:Date.now()});
+ const r=doc(collection(db,'orgs'));
+ await setDoc(r,{name:n,ts:Date.now(),members:[]});
  switchTo(r.id);tab(0);
 };
 window.orgRename=async id=>{
+ if(!window.ISADMIN)return;
  const o=(window.ORGS||[]).find(x=>x.id===id);if(!o)return;
  const n=prompt('Նոր անվանում',o.name);if(!n||!n.trim())return;
- await setDoc(doc(db,'users',uid,'orgs',id),{name:n.trim()},{merge:true});
+ await setDoc(doc(db,'orgs',id),{name:n.trim()},{merge:true});
 };
 window.orgDel=async id=>{
+ if(!window.ISADMIN)return;
  const O=window.ORGS||[],o=O.find(x=>x.id===id);if(!o)return;
  if(O.length<=1){alert('Վերջին կազմակերպությունը հնարավոր չէ ջնջել');return}
  if(!confirm('Ջնջե՞լ «'+o.name+'» կազմակերպությունը ԲՈԼՈՐ տվյալներով։ Սա հնարավոր չէ վերականգնել։'))return;
@@ -298,8 +336,59 @@ window.orgDel=async id=>{
    for(const d of sn.docs){bt.delete(d.ref);if(++n%400===0){await bt.commit();bt=writeBatch(db)}}
    await bt.commit();
   }
-  await deleteDoc(doc(db,'users',uid,'orgs',id));
+  await deleteDoc(doc(db,'orgs',id));
   try{localStorage.removeItem(lk(id))}catch(e){}
+ }catch(e){alert('Սխալ՝ '+(e.code||e.message))}
+};
+const genPw=()=>{const A='abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';const r=new Uint32Array(10);crypto.getRandomValues(r);return Array.from(r,x=>A[x%A.length]).join('')};
+window.orgAccess=id=>{
+ const o=(window.ORGS||[]).find(x=>x.id===id);if(!o||!window.ISADMIN)return;
+ open_(`<b>👥 Հասանելիություն՝ ${esc(o.name)}</b><div style="height:8px"></div>
+ ${o.members.map(m=>`<div class="c r"><span>${esc(m)}</span><button class="b g" onclick="orgUnshare('${id}','${esc(m)}')">✕</button></div>`).join('')||'<div class="mu" style="margin-bottom:8px">Դեռ ոչ ոք չի կցված</div>'}
+ <label class="mu">Հաճախորդի email</label><input id="ac_e" type="email">
+ <label class="mu">Գաղտնաբառ (ավտոմատ ստեղծված, կարող ես փոխել)</label><input id="ac_p" value="${genPw()}">
+ <div class="mu" id="ac_m" style="margin-bottom:8px"></div>
+ <div class="r"><button class="b" onclick="orgShare('${id}')">Ստեղծել հաշիվ և կցել</button><button class="b g" onclick="close_()">Փակել</button></div>`);
+};
+window.orgShare=async id=>{
+ const e=el('ac_e').value.trim().toLowerCase(),p=el('ac_p').value,m=el('ac_m');
+ if(!/^\S+@\S+\.\S+$/.test(e)){m.textContent='Սխալ email';return}
+ if(p.length<6){m.textContent='Գաղտնաբառը առնվազն 6 նիշ պետք է լինի';return}
+ m.textContent='⏳';let created=false;
+ try{
+  if(!secAuth){const a2=initializeApp(cfg,'sec');secAuth=initializeAuth(a2,{persistence:inMemoryPersistence})}
+  try{await createUserWithEmailAndPassword(secAuth,e,p);created=true}catch(er){if(er.code!=='auth/email-already-in-use')throw er}
+  try{await signOut(secAuth)}catch(er){}
+  await updateDoc(doc(db,'orgs',id),{members:arrayUnion(e)});
+  window.orgAccess(id);
+  el('ac_m').innerHTML=created?`✅ Հաշիվը ստեղծված է։<br>Email՝ <b>${esc(e)}</b><br>Գաղտնաբառ՝ <b>${esc(p)}</b><br>Փոխանցիր այս տվյալները հաճախորդին։`:`✅ Այս email-ով հաշիվը արդեն կար, կցվեց այս կազմակերպությանը (գաղտնաբառը չի փոխվել)։`;
+ }catch(er){m.textContent='Սխալ՝ '+(er.code||er.message)}
+};
+window.orgUnshare=async(id,e)=>{
+ if(!confirm('Հեռացնե՞լ հասանելիությունը՝ '+e))return;
+ await updateDoc(doc(db,'orgs',id),{members:arrayRemove(e)});
+ window.orgAccess(id);
+};
+window.migrateLegacy=async()=>{
+ if(!window.ISADMIN)return;
+ if(!confirm('Նախորդ տարբերակի ամպային տվյալները կպատճենվեն նոր կառուցվածք։ Շարունակե՞լ։'))return;
+ try{
+  const legacy=[{id:'main',name:'Հիմնական',ts:1,path:['users',uid]}];
+  const os=await getDocs(collection(db,'users',uid,'orgs'));
+  os.forEach(d=>{const x=d.data();if(d.id==='main'){if(x.name)legacy[0].name=x.name}else legacy.push({id:d.id,name:x.name||'Առանց անվան',ts:x.ts||Date.now(),path:['users',uid,'orgs',d.id]})});
+  let n=0;
+  for(const L of legacy){
+   await setDoc(doc(db,'orgs',L.id),{name:L.name,ts:L.ts},{merge:true});
+   for(const c of CO){
+    const sn=await getDocs(collection(db,...L.path,c));
+    let bt=writeBatch(db),k=0;
+    for(const d of sn.docs){bt.set(doc(db,'orgs',L.id,c,d.id),d.data());n++;if(++k%400===0){await bt.commit();bt=writeBatch(db)}}
+    await bt.commit();
+   }
+  }
+  localStorage.setItem('inv_migrated_'+uid,'1');
+  alert('Տեղափոխվեց '+n+' գրառում։');
+  render();
  }catch(e){alert('Սխալ՝ '+(e.code||e.message))}
 };
 </script>
