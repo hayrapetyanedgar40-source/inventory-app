@@ -28,17 +28,18 @@ video{width:100%;border-radius:12px;background:#000}
 </style>
 </head>
 <body>
-<header>📦 Գույքագրում</header>
+<header>📦 Գույքագրում <span id="sy" class="mu" style="font-size:12px;font-weight:400"></span></header>
 <nav><button id="t0" onclick="tab(0)">Գույք</button><button id="t1" onclick="tab(1)">Վայրեր</button><button id="t3" onclick="tab(3)">Դուրս գրված</button><button id="t2" onclick="tab(2)">Տվյալներ</button></nav>
 <div class="w" id="v"></div>
 <div class="fab"><button class="b g" onclick="scan()">📷 Սկան</button><button class="b" onclick="edit()">＋ Նոր</button></div>
+<div id="lg" style="position:fixed;inset:0;z-index:9;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px"><div class="c" style="width:100%;max-width:360px"><b style="font-size:18px">Մուտք</b><div style="height:10px"></div><input id="lg_e" type="email" placeholder="Email" autocomplete="username"><input id="lg_p" type="password" placeholder="Գաղտնաբառ" autocomplete="current-password"><div id="lg_m" class="mu" style="color:var(--bad);min-height:18px;margin-bottom:6px"></div><button class="b" style="width:100%" onclick="doLogin()">Մուտք գործել</button></div></div>
 <div id="m"><div id="mc"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 let S={locs:[],items:[]},T=0,Q='',F='',stream=null,raf=0;
 try{const x=localStorage.getItem('inv1');if(x)S=JSON.parse(x)}catch(e){}
 S.written=S.written||[];
-const save=()=>{try{localStorage.setItem('inv1',JSON.stringify(S))}catch(e){}};
+const save=()=>{try{localStorage.setItem('inv1',JSON.stringify(S))}catch(e){}if(window.cloudPush)window.cloudPush()};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const id=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -62,7 +63,7 @@ function render(){
  }else{
   $('v').innerHTML=`<div class="c"><b>Արտահանում</b><div class="mu" style="margin:4px 0 10px">CSV բացվում է Excel-ում, JSON՝ լրիվ պահուստ</div><button class="b" onclick="xla()">Excel</button> <button class="b g" onclick="csv()">CSV</button> <button class="b g" onclick="jsn()">JSON պահուստ</button></div>
   <div class="c"><b>Ներմուծում Excel-ից (.xlsx)</b><div class="mu" style="margin:4px 0 8px">Առաջին թերթը, առաջին տողը՝ սյունակների վերնագրեր (Կոդ, Անվանում, Քանակ, Վայր…)։ Նույն կոդով միավորը կթարմացվի, նորը՝ կավելանա։</div><input type="file" accept=".xlsx,.xls" onchange="impx(this.files[0]);this.value=''"></div><div class="c"><b>Ներմուծում (JSON պահուստ)</b><input type="file" accept=".json" onchange="imp(this.files[0])"></div>
-  <div class="c"><div class="mu">Տվյալները պահվում են այս սարքի դիտարկիչում։ Պարբերաբար արտահանիր պահուստ։</div></div>`;
+  <div class="c"><div class="r"><div class="mu">☁ Տվյալները սինխրոնացվում են ամպի հետ</div><button class="b g" onclick="doLogout()">Դուրս գալ</button></div></div>`;
  }
 }
 function render2(){const q=Q.toLowerCase();$('lst').innerHTML=list(S.items.filter(i=>(!F||i.loc===F)&&(!q||(i.name+i.code+i.cat+i.note).toLowerCase().includes(q))))}
@@ -155,6 +156,78 @@ function jsn(){dl('inventory-backup.json',JSON.stringify(S),'application/json')}
 function imp(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.items&&d.locs){S=d;save();alert('Ներմուծվեց');tab(0)}}catch(e){alert('Սխալ ֆայլ')}};r.readAsText(f)}
 tab(0);
 if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,writeBatch} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyChch1QNDSJiA4nqKUZlX-WqC1zqO0EeGo",authDomain:"inventory-app-7495a.firebaseapp.com",projectId:"inventory-app-7495a",storageBucket:"inventory-app-7495a.firebasestorage.app",messagingSenderId:"551746067046",appId:"1:551746067046:web:6ee9c0e20dac6d6d3aeba7"});
+const auth=getAuth(app);
+const db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
+const CO=['locs','items','written'];
+let uid=null,unsubs=[],last={locs:{},items:{},written:{}},ready=false,first={};
+const sy=t=>{const e=document.getElementById('sy');if(e)e.textContent=t};
+async function push(force){
+ if(!uid||(!ready&&!force))return false;
+ const ops=[];
+ for(const c of CO){
+  const cur={};(S[c]||[]).forEach(x=>{cur[x.id]=JSON.stringify(x)});
+  for(const k in cur)if(last[c][k]!==cur[k])ops.push(['set',c,k,JSON.parse(cur[k])]);
+  for(const k in last[c])if(!(k in cur))ops.push(['del',c,k]);
+  last[c]=cur;
+ }
+ if(!ops.length)return true;
+ sy('⏳');let ok=true;
+ for(let i=0;i<ops.length;i+=400){
+  const b=writeBatch(db);
+  ops.slice(i,i+400).forEach(o=>{const r=doc(db,'users',uid,o[1],o[2]);o[0]==='set'?b.set(r,o[3]):b.delete(r)});
+  try{await b.commit()}catch(e){ok=false;sy('⚠ '+(e.code||'error'));console.error(e)}
+ }
+ if(ok)sy('☁ ✓');
+ return ok;
+}
+window.cloudPush=()=>{push(false)};
+function listen(){
+ CO.forEach(c=>{
+  unsubs.push(onSnapshot(collection(db,'users',uid,c),snap=>{
+   const arr=[],m={};
+   snap.forEach(d=>{const x=d.data();x.id=d.id;arr.push(x);m[d.id]=JSON.stringify(x)});
+   arr.sort((a,b)=>a.id<b.id?1:-1);
+   S[c]=arr;last[c]=m;
+   try{localStorage.setItem('inv1',JSON.stringify(S))}catch(e){}
+   first[c]=1;if(first.locs&&first.items&&first.written){ready=true;sy(navigator.onLine?'☁ ✓':'☁ օֆլայն')}
+   const ae=document.activeElement;
+   if(document.getElementById('m').style.display!=='flex'&&!(ae&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)))render();
+  },err=>{sy('⚠ '+(err.code||'error'));console.error(err)}));
+ });
+}
+function stopAll(){unsubs.forEach(u=>u());unsubs=[];uid=null;ready=false;first={};last={locs:{},items:{},written:{}};sy('')}
+async function start(u){
+ stopAll();uid=u.uid;
+ const flag='inv_synced_'+uid;
+ if(!localStorage.getItem(flag)){
+  sy('⏳');
+  const ok=await push(true);
+  if(!ok){alert('Ամպին միանալ չհաջողվեց։ Ստուգիր Firestore-ի կանոնները և ինտերնետը։ Տվյալները մնում են այս սարքում։');return}
+  localStorage.setItem(flag,'1');
+ }
+ listen();
+}
+onAuthStateChanged(auth,u=>{
+ if(u){document.getElementById('lg').style.display='none';start(u)}
+ else{stopAll();document.getElementById('lg').style.display='flex'}
+});
+window.doLogin=async()=>{
+ const m=document.getElementById('lg_m');m.textContent='';
+ try{await signInWithEmailAndPassword(auth,document.getElementById('lg_e').value.trim(),document.getElementById('lg_p').value)}
+ catch(e){m.textContent=(e.code==='auth/network-request-failed')?'Ինտերնետ չկա':'Սխալ email կամ գաղտնաբառ'}
+};
+window.doLogout=async()=>{
+ if(!confirm('Դուրս գա՞լ։ Տեղային պատճենը այս սարքից կջնջվի, տվյալները կմնան ամպում։'))return;
+ await signOut(auth);
+ S.locs=[];S.items=[];S.written=[];try{localStorage.removeItem('inv1')}catch(e){}
+ render();
+};
 </script>
 </body>
 </html>
