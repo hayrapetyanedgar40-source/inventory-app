@@ -24,11 +24,12 @@ nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
 .tag{font-size:12px;padding:2px 8px;border-radius:8px;border:1px solid var(--bd)}
 #m{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;z-index:5}
 #m>div{background:var(--bg);width:100%;max-height:92%;overflow:auto;padding:14px;border-radius:18px 18px 0 0;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+.og{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
 video{width:100%;border-radius:12px;background:#000}
 </style>
 </head>
 <body>
-<header>📦 Գույքագրում <span id="sy" class="mu" style="font-size:12px;font-weight:400"></span></header>
+<header style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><span id="on_h" onclick="tab(4)" style="cursor:pointer">📦 Գույքագրում ▾</span> <span id="sy" class="mu" style="font-size:12px;font-weight:400"></span></span><button class="b g" style="padding:6px 12px;font-size:13px" onclick="doLogout()">Ելք</button></header>
 <nav><button id="t0" onclick="tab(0)">Գույք</button><button id="t1" onclick="tab(1)">Վայրեր</button><button id="t3" onclick="tab(3)">Դուրս գրված</button><button id="t2" onclick="tab(2)">Տվյալներ</button></nav>
 <div class="w" id="v"></div>
 <div class="fab"><button class="b g" onclick="scan()">📷 Սկան</button><button class="b" onclick="edit()">＋ Նոր</button></div>
@@ -39,7 +40,7 @@ video{width:100%;border-radius:12px;background:#000}
 let S={locs:[],items:[]},T=0,Q='',F='',stream=null,raf=0;
 try{const x=localStorage.getItem('inv1');if(x)S=JSON.parse(x)}catch(e){}
 S.written=S.written||[];
-const save=()=>{try{localStorage.setItem('inv1',JSON.stringify(S))}catch(e){}if(window.cloudPush)window.cloudPush()};
+const save=()=>{try{localStorage.setItem(window.LK||'inv1',JSON.stringify(S))}catch(e){}if(window.cloudPush)window.cloudPush()};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const id=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -51,6 +52,7 @@ const ST=['Աշխատում է','Վերանորոգման','Վնասված','Դ�
 function tab(n){T=n;[0,1,2,3].forEach(i=>$('t'+i).classList.toggle('on',i===n));render()}
 function render(){
  if(T===3){wr();return}
+ if(T===4){ov();return}
  if(T===0){
   const q=Q.toLowerCase();
   const L=S.items.filter(i=>(!F||i.loc===F)&&(!q||(i.name+i.code+i.cat+i.note).toLowerCase().includes(q)));
@@ -119,12 +121,12 @@ async function xl(){if(!S.written.length){alert('Դուրս գրված գույ�
  const h=['Գույքագրման №','Կոդ','Անվանում','Կատեգորիա','Քանակ','Վայր','Հաշիվ','Գնման ամսաթիվ','Գնման հիմք','Միավորի արժեք','Ծառայության ժամկետ (տարի)','Լուծարային արժեք','Պատասխանատու','Սկզբնական արժեք (ընդհանուր)','Կուտակված մաշվածք','Հաշվեկշռային արժեք','Դուրս գրման ամսաթիվ','Դուրս գրման հիմք','Պատճառ'];
  const rows=S.written.map(i=>[i.inv,i.code,i.name,i.cat,i.qty,i.locN,i.acct,i.date,i.basis,i.cost,i.life,i.resid,i.resp,Math.round(i.woCost||0),Math.round(i.woAcc||0),Math.round(i.woBook||0),i.woDate,i.woBasis,i.woReason].map(v=>v??''));
  const ws=XLSX.utils.aoa_to_sheet([h,...rows]);ws['!cols']=h.map(()=>({wch:20}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Դուրս գրված');
- const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});await dl('written-off-inventory.xlsx',new Blob([buf]))}
+ const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});await dl('written-off-'+orgTag()+'.xlsx',new Blob([buf]))}
 const XH=['Կոդ','Անվանում','Կատեգորիա','Քանակ','Վայր','Վիճակ','Նշում','Գույքագրման համար','Հաշիվ','Միավորի արժեք','Գնման ամսաթիվ','Ծառայության ժամկետ (տարի)','Լուծարային արժեք','Պատասխանատու','Գնման հիմք','Սկզբնական արժեք (ընդհանուր)','Կուտակված մաշվածք','Հաշվեկշռային արժեք'];
 async function xla(){if(!window.XLSX){alert('Excel գրադարանը չբեռնվեց');return}
  const rows=S.items.map(i=>{const d=dep(i);return [i.code,i.name,i.cat,i.qty,locName(i.loc),i.status,i.note,i.inv,i.acct,i.cost,i.date,i.life,i.resid,i.resp,i.basis,Math.round(d.cost),Math.round(d.acc),Math.round(d.book)].map(v=>v??'')});
  const ws=XLSX.utils.aoa_to_sheet([XH,...rows]);ws['!cols']=XH.map(()=>({wch:20}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Գույք');
- await dl('inventory.xlsx',new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})]))}
+ await dl('inventory-'+orgTag()+'.xlsx',new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})]))}
 const IK={code:['կոդ','շտրիխկոդ','barcode','code','sku'],name:['անվանում','անուն','name','item'],cat:['կատեգորիա','category'],qty:['քանակ','qty','quantity'],loc:['վայր','տեղ','գրասենյակ','location'],status:['վիճակ','status'],note:['նշում','note'],inv:['գույքագրման համար','գույքագրման №','inv'],acct:['հաշիվ','account'],cost:['միավորի արժեք','cost','price','արժեք'],date:['գնման ամսաթիվ','ձեռքբերման ամսաթիվ','ամսաթիվ','date'],life:['ծառայության ժամկետ','life'],resid:['լուծարային','residual'],resp:['պատասխանատու','responsible'],basis:['գնման հիմք','հիմք','basis']};
 function impx(f){if(!f)return;if(!window.XLSX){alert('Excel գրադարանը չբեռնվեց');return}
  const r=new FileReader();r.onload=()=>{try{
@@ -147,86 +149,158 @@ async function nfc(fill){const sm=$('sm');if(!('NDEFReader' in window)){sm.textC
  try{window.nc=new AbortController();const r=new NDEFReader();await r.scan({signal:window.nc.signal});sm.textContent='Մոտեցրու NFC պիթակը հեռախոսի հետևին…';
   r.onreading=e=>{found((e.serialNumber||'').replace(/:/g,'').toUpperCase(),fill)};r.onreadingerror=()=>{sm.textContent='Պիթակը չկարդացվեց, փորձիր նորից'}
  }catch(e){sm.textContent='NFC-ն անջատված է կամ թույլտվություն չկա։ Միացրու NFC-ն հեռախոսի կարգավորումներում'}}
+// organizations
+const orgTag=()=>{const o=(window.ORGS||[]).find(x=>x.id===window.CUR);return((o?o.name:'org').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,''))||'org'};
+function calcStats(){let u=0,c=0,b=0;S.items.forEach(i=>{const d=dep(i);u+=+i.qty||0;c+=d.cost;b+=d.book});return{items:S.items.length,units:u,cost:Math.round(c),book:Math.round(b),written:S.written.length}}
+function ov(){
+ const O=window.ORGS||[];
+ if(!window.orgAdd){$('v').innerHTML='<div class="mu">Կազմակերպությունների կառավարումը հասանելի է միայն ամպային տարբերակում։</div>';return}
+ let tI=0,tU=0,tB=0,tW=0;const st={};
+ O.forEach(o=>{const s=o.id===window.CUR?calcStats():(o.stats||null);st[o.id]=s;if(s){tI+=s.items||0;tU+=s.units||0;tB+=s.book||0;tW+=s.written||0}});
+ $('v').innerHTML=`<div class="c"><b>Կառավարման կենտրոն</b><div style="height:6px"></div><div class="r"><span class="mu">Կազմակերպություններ</span><b>${O.length}</b></div><div class="r"><span class="mu">Միավորներ (տեսակ / քանակ)</span><b>${tI} / ${tU}</b></div><div class="r"><span class="mu">Հաշվեկշռային արժեք (ընդհանուր)</span><b>${fmt(tB)}</b></div><div class="r"><span class="mu">Դուրս գրված</span><b>${tW}</b></div></div>
+ <div class="c"><input id="on" placeholder="Նոր կազմակերպության անվանում"><button class="b" onclick="orgAdd()">＋ Ավելացնել կազմակերպություն</button></div>
+ <div class="og">${O.map(o=>{const s=st[o.id];return `<div class="c"><div class="r"><b>${esc(o.name)}</b>${o.id===window.CUR?'<span class="tag">ակտիվ</span>':''}</div>${s?`<div class="mu">${s.items} տեսակ · ${s.units} միավոր</div><div class="mu">Հաշվեկշռային՝ ${fmt(s.book)} · Դուրս գրված՝ ${s.written}</div>`:'<div class="mu">Տվյալները դեռ չեն բացվել</div>'}<div class="r" style="margin-top:8px"><button class="b" onclick="orgOpen('${o.id}')">Բացել</button><span><button class="b g" onclick="orgRename('${o.id}')">✏</button> <button class="b g" onclick="orgDel('${o.id}')">🗑</button></span></div></div>`}).join('')}</div>`;
+}
 // export/import
 async function dl(n,t,m){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:t});return}}catch(e){if(e&&e.code==='declined')return}
  const a=document.createElement('a');a.href=URL.createObjectURL(t instanceof Blob?t:new Blob([t],{type:m}));a.download=n;a.click()}
 function csv(){const h=['Կոդ','Անվանում','Կատեգորիա','Քանակ','Վայր','Վիճակ','Նշում','Գույքագրման համար','Հաշիվ','Միավորի արժեք','Ձեռքբերման ամսաթիվ','Ծառայության ժամկետ (տարի)','Լուծարային արժեք','Պատասխանատու','Սկզբնական արժեք (ընդհանուր)','Կուտակված մաշվածք','Հաշվեկշռային արժեք','Գնման հիմք'];const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
- dl('inventory.csv','\ufeff'+[h.map(q).join(',')].concat(S.items.map(i=>[i.code,i.name,i.cat,i.qty,locName(i.loc),i.status,i.note,i.inv,i.acct,i.cost,i.date,i.life,i.resid,i.resp,Math.round(dep(i).cost),Math.round(dep(i).acc),Math.round(dep(i).book),i.basis].map(q).join(','))).join('\n'),'text/csv')}
-function jsn(){dl('inventory-backup.json',JSON.stringify(S),'application/json')}
+ dl('inventory-'+orgTag()+'.csv','\ufeff'+[h.map(q).join(',')].concat(S.items.map(i=>[i.code,i.name,i.cat,i.qty,locName(i.loc),i.status,i.note,i.inv,i.acct,i.cost,i.date,i.life,i.resid,i.resp,Math.round(dep(i).cost),Math.round(dep(i).acc),Math.round(dep(i).book),i.basis].map(q).join(','))).join('\n'),'text/csv')}
+function jsn(){dl('backup-'+orgTag()+'.json',JSON.stringify(S),'application/json')}
 function imp(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.items&&d.locs){S=d;save();alert('Ներմուծվեց');tab(0)}}catch(e){alert('Սխալ ֆայլ')}};r.readAsText(f)}
 tab(0);
 if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,writeBatch} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getAuth,setPersistence,browserLocalPersistence,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,writeBatch,setDoc,deleteDoc,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyChch1QNDSJiA4nqKUZlX-WqC1zqO0EeGo",authDomain:"inventory-app-7495a.firebaseapp.com",projectId:"inventory-app-7495a",storageBucket:"inventory-app-7495a.firebasestorage.app",messagingSenderId:"551746067046",appId:"1:551746067046:web:6ee9c0e20dac6d6d3aeba7"});
 const auth=getAuth(app);
+try{await setPersistence(auth,browserLocalPersistence)}catch(e){}
 const db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
 const CO=['locs','items','written'];
-let uid=null,unsubs=[],last={locs:{},items:{},written:{}},ready=false,first={};
-const sy=t=>{const e=document.getElementById('sy');if(e)e.textContent=t};
+const E0=()=>({locs:{},items:{},written:{}});
+let uid=null,unsubs=[],orgUn=null,cur=null,last=E0(),ready=false,first={},gen=0;
+const el=id=>document.getElementById(id);
+const sy=t=>{const e=el('sy');if(e)e.textContent=t};
+const base=(o=cur)=>o==='main'?['users',uid]:['users',uid,'orgs',o];
+const lk=o=>o==='main'?'inv1':'inv_data_'+o;
+function hdr(){const o=(window.ORGS||[]).find(x=>x.id===cur);const e=el('on_h');if(e)e.textContent='📦 '+(o?o.name:'Գույքագրում')+' ▾'}
+function setCur(o){cur=o;window.CUR=o;window.LK=lk(o);try{localStorage.setItem('inv_org_'+uid,o)}catch(e){}hdr()}
+function loadLocal(){let p={};try{p=JSON.parse(localStorage.getItem(window.LK)||'{}')}catch(e){}S.locs=p.locs||[];S.items=p.items||[];S.written=p.written||[]}
+function stats(){if(uid&&cur)setDoc(doc(db,'users',uid,'orgs',cur),{stats:calcStats()},{merge:true}).catch(()=>{})}
 async function push(force){
  if(!uid||(!ready&&!force))return false;
- const ops=[];
+ const o=cur,b=base(o),ops=[];
  for(const c of CO){
-  const cur={};(S[c]||[]).forEach(x=>{cur[x.id]=JSON.stringify(x)});
-  for(const k in cur)if(last[c][k]!==cur[k])ops.push(['set',c,k,JSON.parse(cur[k])]);
-  for(const k in last[c])if(!(k in cur))ops.push(['del',c,k]);
-  last[c]=cur;
+  const now={};(S[c]||[]).forEach(x=>{now[x.id]=JSON.stringify(x)});
+  for(const k in now)if(last[c][k]!==now[k])ops.push(['set',c,k,JSON.parse(now[k])]);
+  for(const k in last[c])if(!(k in now))ops.push(['del',c,k]);
+  last[c]=now;
  }
  if(!ops.length)return true;
  sy('⏳');let ok=true;
  for(let i=0;i<ops.length;i+=400){
-  const b=writeBatch(db);
-  ops.slice(i,i+400).forEach(o=>{const r=doc(db,'users',uid,o[1],o[2]);o[0]==='set'?b.set(r,o[3]):b.delete(r)});
-  try{await b.commit()}catch(e){ok=false;sy('⚠ '+(e.code||'error'));console.error(e)}
+  const bt=writeBatch(db);
+  ops.slice(i,i+400).forEach(p=>{const r=doc(db,...b,p[1],p[2]);p[0]==='set'?bt.set(r,p[3]):bt.delete(r)});
+  try{await bt.commit()}catch(e){ok=false;sy('⚠ '+(e.code||'error'));console.error(e)}
  }
- if(ok)sy('☁ ✓');
+ if(ok){sy('☁ ✓');if(o===cur)stats()}
  return ok;
 }
 window.cloudPush=()=>{push(false)};
 function listen(){
+ const g=++gen,b=base();
  CO.forEach(c=>{
-  unsubs.push(onSnapshot(collection(db,'users',uid,c),snap=>{
+  unsubs.push(onSnapshot(collection(db,...b,c),snap=>{
+   if(g!==gen)return;
    const arr=[],m={};
    snap.forEach(d=>{const x=d.data();x.id=d.id;arr.push(x);m[d.id]=JSON.stringify(x)});
    arr.sort((a,b)=>a.id<b.id?1:-1);
    S[c]=arr;last[c]=m;
-   try{localStorage.setItem('inv1',JSON.stringify(S))}catch(e){}
-   first[c]=1;if(first.locs&&first.items&&first.written){ready=true;sy(navigator.onLine?'☁ ✓':'☁ օֆլայն')}
+   try{localStorage.setItem(window.LK,JSON.stringify(S))}catch(e){}
+   first[c]=1;
+   if(first.locs&&first.items&&first.written&&!ready){ready=true;sy(navigator.onLine?'☁ ✓':'☁ օֆլայն');stats()}
    const ae=document.activeElement;
-   if(document.getElementById('m').style.display!=='flex'&&!(ae&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)))render();
+   if(el('m').style.display!=='flex'&&!(ae&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)))render();
   },err=>{sy('⚠ '+(err.code||'error'));console.error(err)}));
  });
 }
-function stopAll(){unsubs.forEach(u=>u());unsubs=[];uid=null;ready=false;first={};last={locs:{},items:{},written:{}};sy('')}
-async function start(u){
- stopAll();uid=u.uid;
- const flag='inv_synced_'+uid;
+async function startData(){
+ const o=cur,flag=o==='main'?'inv_synced_'+uid:'inv_sync_'+uid+'_'+o;
  if(!localStorage.getItem(flag)){
   sy('⏳');
   const ok=await push(true);
   if(!ok){alert('Ամպին միանալ չհաջողվեց։ Ստուգիր Firestore-ի կանոնները և ինտերնետը։ Տվյալները մնում են այս սարքում։');return}
   localStorage.setItem(flag,'1');
  }
+ if(o!==cur)return;
  listen();
 }
+function stopData(){gen++;unsubs.forEach(u=>u());unsubs=[];ready=false;first={};last=E0()}
+function switchTo(o){stopData();setCur(o);loadLocal();F='';Q='';render();startData()}
+function listenOrgs(){
+ orgUn=onSnapshot(collection(db,'users',uid,'orgs'),snap=>{
+  const a=[];snap.forEach(d=>{const x=d.data();a.push({id:d.id,...x,name:x.name||(d.id==='main'?'Հիմնական':'Առանց անվան')})});
+  a.sort((x,y)=>(x.ts||0)-(y.ts||0));
+  window.ORGS=a;
+  if(snap.empty&&!snap.metadata.fromCache){setDoc(doc(db,'users',uid,'orgs','main'),{name:'Հիմնական',ts:1},{merge:true}).catch(()=>{});return}
+  if(a.length&&!a.find(x=>x.id===cur)){switchTo(a[0].id);return}
+  hdr();if(T===4)render();
+ },err=>console.error(err));
+}
+function stopAll(){stopData();if(orgUn){orgUn();orgUn=null}uid=null;window.ORGS=[];sy('')}
+async function start(u){
+ stopAll();uid=u.uid;
+ setCur(localStorage.getItem('inv_org_'+uid)||'main');loadLocal();render();
+ listenOrgs();startData();
+}
 onAuthStateChanged(auth,u=>{
- if(u){document.getElementById('lg').style.display='none';start(u)}
- else{stopAll();document.getElementById('lg').style.display='flex'}
+ if(u){el('lg').style.display='none';start(u)}
+ else{stopAll();el('lg').style.display='flex'}
 });
 window.doLogin=async()=>{
- const m=document.getElementById('lg_m');m.textContent='';
- try{await signInWithEmailAndPassword(auth,document.getElementById('lg_e').value.trim(),document.getElementById('lg_p').value)}
+ const m=el('lg_m');m.textContent='';
+ try{await signInWithEmailAndPassword(auth,el('lg_e').value.trim(),el('lg_p').value)}
  catch(e){m.textContent=(e.code==='auth/network-request-failed')?'Ինտերնետ չկա':'Սխալ email կամ գաղտնաբառ'}
 };
 window.doLogout=async()=>{
  if(!confirm('Դուրս գա՞լ։ Տեղային պատճենը այս սարքից կջնջվի, տվյալները կմնան ամպում։'))return;
  await signOut(auth);
- S.locs=[];S.items=[];S.written=[];try{localStorage.removeItem('inv1')}catch(e){}
- render();
+ S.locs=[];S.items=[];S.written=[];
+ Object.keys(localStorage).filter(k=>k==='inv1'||k.startsWith('inv_data_')).forEach(k=>localStorage.removeItem(k));
+ window.LK=undefined;render();
+};
+window.orgOpen=id=>{if(id!==cur)switchTo(id);tab(0)};
+window.orgAdd=async()=>{
+ const n=el('on').value.trim();if(!n)return;
+ const r=doc(collection(db,'users',uid,'orgs'));
+ await setDoc(r,{name:n,ts:Date.now()});
+ switchTo(r.id);tab(0);
+};
+window.orgRename=async id=>{
+ const o=(window.ORGS||[]).find(x=>x.id===id);if(!o)return;
+ const n=prompt('Նոր անվանում',o.name);if(!n||!n.trim())return;
+ await setDoc(doc(db,'users',uid,'orgs',id),{name:n.trim()},{merge:true});
+};
+window.orgDel=async id=>{
+ const O=window.ORGS||[],o=O.find(x=>x.id===id);if(!o)return;
+ if(O.length<=1){alert('Վերջին կազմակերպությունը հնարավոր չէ ջնջել');return}
+ if(!confirm('Ջնջե՞լ «'+o.name+'» կազմակերպությունը ԲՈԼՈՐ տվյալներով։ Սա հնարավոր չէ վերականգնել։'))return;
+ if(!confirm('Վերջին հաստատում. ջնջե՞լ «'+o.name+'»'))return;
+ if(id===cur){const n=O.find(x=>x.id!==id);switchTo(n.id)}
+ try{
+  const b=base(id);
+  for(const c of CO){
+   const sn=await getDocs(collection(db,...b,c));
+   let bt=writeBatch(db),n=0;
+   for(const d of sn.docs){bt.delete(d.ref);if(++n%400===0){await bt.commit();bt=writeBatch(db)}}
+   await bt.commit();
+  }
+  await deleteDoc(doc(db,'users',uid,'orgs',id));
+  try{localStorage.removeItem(lk(id))}catch(e){}
+ }catch(e){alert('Սխալ՝ '+(e.code||e.message))}
 };
 </script>
 </body>
